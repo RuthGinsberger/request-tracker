@@ -1,0 +1,3 @@
+"Label","Scenario","Statement","LogicalReads","CpuMs","ElapsedMs","ColdElapsedMs","ColdPhysicalReads"
+"ablation-no-status-createdat-10","10-status-daterange","count","250","0","4","9","249"
+"ablation-no-status-createdat-10","10-status-daterange","page","7","0","4","3","249"

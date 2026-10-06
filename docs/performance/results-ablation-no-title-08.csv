@@ -1,0 +1,3 @@
+"Label","Scenario","Statement","LogicalReads","CpuMs","ElapsedMs","ColdElapsedMs","ColdPhysicalReads"
+"ablation-no-title-08","08-status-title","count","23","0","3","4","22"
+"ablation-no-title-08","08-status-title","page","1975","16","111","106","1974"

@@ -1,0 +1,3 @@
+"Label","Scenario","Statement","LogicalReads","CpuMs","ElapsedMs","ColdElapsedMs","ColdPhysicalReads"
+"ablation-no-title-12","12-search-rare","count","1975","15","52","70","1974"
+"ablation-no-title-12","12-search-rare","page","1979","15","67","78","1974"

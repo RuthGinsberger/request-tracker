@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.log
+
+# Node / Angular
+node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+!frontend/.vscode/
+
+# Secrets / local config
+.env
+appsettings.Local.json
+.claude/settings.local.json
+
+# Build output / archives
+dist/
+.angular/
+*.zip

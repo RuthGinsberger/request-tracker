@@ -1,0 +1,81 @@
+# For evaluators and CI only. Not run on the dev machine (no Docker there).
+# Start: docker compose up --build   ->   UI at http://localhost:8080
+# Order: db (healthy) -> seeder (migrates + seeds if empty, exits 0) -> api (healthy) -> ui.
+# The seeder owns the migrations; the API never migrates, so there is no startup race.
+# SQL Server 2022 also runs on Apple Silicon through Rosetta emulation
+# (enable "Use Rosetta" in Docker Desktop). Ports and the SA password are overridable in .env.
+# The SA password is a development-only default; avoid ";" and "$" in an override
+# (it is embedded in the connection string).
+x-connection-string: &connection-string
+  ConnectionStrings__Default: "Server=db,1433;Database=RequestTracker;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Dev_Passw0rd!};TrustServerCertificate=True"
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Dev_Passw0rd!}
+      MSSQL_PID: Developer
+    ports:
+      - "${DB_PORT:-1433}:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  seeder:
+    build:
+      context: ./backend
+      target: seeder
+    # Default CMD of the image is --if-empty. Re-seed: docker compose run --rm seeder --reset
+    environment:
+      <<: *connection-string
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      target: api
+    environment:
+      <<: *connection-string
+      # Production hides the OpenAPI UI. Set API_ENVIRONMENT=Development in .env to enable
+      # http://localhost:5280/scalar/v1 (and detailed error responses).
+      ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Production}
+    ports:
+      - "${API_PORT:-5280}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      seeder:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  ui:
+    build:
+      context: ./frontend
+    ports:
+      - "${UI_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+volumes:
+  sqldata:

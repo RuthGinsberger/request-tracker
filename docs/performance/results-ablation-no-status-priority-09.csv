@@ -1,0 +1,3 @@
+"Label","Scenario","Statement","LogicalReads","CpuMs","ElapsedMs","ColdElapsedMs","ColdPhysicalReads"
+"ablation-no-status-priority-09","09-summary","status","138","0","12","48","137"
+"ablation-no-status-priority-09","09-summary","priority","138","0","37","37","137"

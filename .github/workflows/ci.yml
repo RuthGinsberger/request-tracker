@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (build, format, tests on SQL Server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Throwaway value for the disposable CI container only. It is NOT a secret.
+      MSSQL_SA_PASSWORD: Ci_Passw0rd_NotASecret1
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Ci_Passw0rd_NotASecret1
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PASSWORD -C -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: backend/global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/**/*.csproj', 'backend/Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet restore backend/RequestTracker.slnx
+      - run: dotnet build backend/RequestTracker.slnx --no-restore --configuration Release
+      - name: Format check
+        run: dotnet format backend/RequestTracker.slnx --verify-no-changes --no-restore
+      - name: Test
+        env:
+          INTEGRATIONTESTS_SQLSERVER: localhost,1433;User Id=sa;Password=Ci_Passw0rd_NotASecret1;TrustServerCertificate=True
+        run: >-
+          dotnet test backend/RequestTracker.slnx --no-build --configuration Release
+          --logger "trx;LogFilePrefix=results" --results-directory test-results
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/**/*.trx
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend (lint, test, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx ng lint
+      # Vitest runs on jsdom (no browser needed).
+      - run: npx ng test --watch=false
+      - run: npx ng build
+
+  compose-smoke:
+    name: Docker Compose smoke test
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Smoke test (up, seed, API checks through the UI proxy, down)
+        run: bash ci/compose-smoke.sh
+      # compose-smoke.sh prints the logs on failure and always runs `docker compose down -v`;
+      # this is a safety net in case the job is cancelled mid-script.
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans

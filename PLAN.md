@@ -1,0 +1,24 @@
+# PLAN
+
+Status values: Todo · In progress · Done. Update at the end of every task.
+
+| Task # | Title | Requirements | Depends on | Optional? | Status | Notes |
+|---|---|---|---|---|---|---|
+| 1 | Bootstrap | R0, R4, R49, R57, R59, R68 | – | No | Done | Node 24.13 is too old for the Angular CLI; see CLAUDE.md "Environment" for the workaround |
+| 2 | Architecture & design + work plan | R1, R2, R5–R23, R37–R41, R43–R48, R61, R64 | 1 | No | Done | Produced `docs/ARCHITECTURE.md` and `docs/WORK_PLAN.md` (180.5 h, 9 features, 10 stories, 45 tasks); decisions D-017–D-023 |
+| 3 | Domain, persistence, transition policy, migration | R2, R4, R16, R18, R20, R34, R51 | 2 | No | Done | Migration `InitialCreate` applied to LocalDB; 46 unit tests; decisions D-024–D-027 |
+| 4 | Seeder ≥100k | R3 | 3 | No | Done | 100k seeded in ~8-10 s on LocalDB; 20 new unit tests; decisions D-028–D-031 |
+| 5 | API foundation, GET by id, integration-test harness | R12, R13, R15, R42d, R49–R56 | 3 | No | Done | `GET /api/requests/{id}` + ETag; ProblemDetails, validation filter, health, Scalar UI; harness on a unique LocalDB/CI database per run with Respawn; 10 integration + 50 new unit tests; decisions D-032–D-036 |
+| 6 | List endpoint: paging/filter/search/sort | R5–R9, R11–R13, R24, R36, R42a, R42b, R42d | 5 | No | Done | `GET /api/requests`: filters, prefix search, 5-field whitelist sort with Id tie-breaker, offset paging; 71 new integration + 79 new unit tests; decisions D-037–D-043 |
+| 7 | Aggregations, lookups, cache | R10, R37, R38, R40, R41 | 6 | No | Done | `GET /api/requests/summary` and `GET /api/lookups` behind `IRequestReadCache` (HybridCache, TTL 60 s / 10 min from `Cache` options); 5 new unit + 7 new integration tests; decisions D-044–D-048 |
+| 8 | Status update, concurrency, audit, history | R15–R21, R39, R42b, R42c, R42d | 7 | No | Done | `PATCH /api/requests/{id}/status` (If-Match, 409/428/400/404) + `GET /api/requests/{id}/history`; shared `RequestStatusChanger` for Task 9; suite now 197 unit + 131 integration tests; decisions D-049–D-053 |
+| 9 | Bulk status update | R22, R23, R39 | 8 | No | Done | `POST /api/requests/bulk-status` (Partial Success, 200 + per-item results) via `BulkStatusService` reusing `RequestStatusChanger`; 19 new unit + 14 new integration tests (suite 216 unit + 145 integration); decisions D-054–D-057 |
+| 10 | Angular foundation | R31, R49, R50 | 6 | No | Done | Models, `RequestsApiService`, two interceptors, `CurrentUserService` + toolbar picker, dev proxy, shell and `/requests` placeholder; 19 frontend tests; decisions D-058–D-061 |
+| 11 | Angular list | R24–R27, R31 | 10 | No | Done | `RequestsListStore` (debounce → switchMap pipeline), page + filters + table components, URL-synced state; 20 new frontend tests (39 total); decisions D-062–D-066 |
+| 12 | Angular summary, status update + 409, history | R27–R31 | 11, 8 | No | Done | `SummaryStore`/`SummaryComponent`, `StatusUpdateService` (409 flow), `HistoryDialogComponent`, row actions; 23 new frontend tests (62 total); decisions D-067–D-070. Two-window conflict verified over HTTP, not clicked in a browser |
+| 13 | Performance analysis & index tuning | R14, R32–R36 | 9, 4 | No | Done | `perf/` scripts + `docs/PERFORMANCE.md` (17 scenarios on 100k rows, actual plans in `docs/performance/`); migrations `CoveringCreatedAtIndex` (page 1 182 → 6 reads, deep page 245,183 → 1,582) and `SortColumnIndexes` (sort by updatedAt/priority/status 2,010 → ~185 reads); decisions D-071–D-076 |
+| 14 | Run readiness: Docker Compose for evaluators, verified in CI | R58, R67 | 12, 13 | No | Done (pending CI verification) | Dockerfiles (backend: `api` + `seeder` targets; frontend: nginx), full Compose, `.env.example`, `.gitattributes`, `docs/COMPOSE_SMOKE_CHECKLIST.md`; mirrored publish/build, 361 backend + 62 frontend tests and lint pass locally; decisions D-077–D-080 |
+| 15 | CI pipeline incl. SQL Server tests + Compose smoke test | R67, R69 | 14 | No | Done (pending first CI run) | `.github/workflows/ci.yml` (backend on a SQL Server 2022 service container, frontend, compose-smoke) + `ci/compose-smoke.sh`; actionlint clean, all non-Docker commands pass locally; **push to GitHub and check the Actions tab: the compose-smoke job is the proof that the Docker setup works**; decisions D-081–D-084 |
+| 16 | Frontend tests | R25, R26, R28 | 12 | Yes | Todo | |
+| 17 | Documentation | R14, R23, R41, R58–R66, R70 | 14 | No | Todo | |
+| 18 | Final evaluator review | All | 1–17 | No | Todo | |

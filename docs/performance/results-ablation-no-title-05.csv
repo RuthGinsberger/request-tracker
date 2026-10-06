@@ -1,0 +1,3 @@
+"Label","Scenario","Statement","LogicalReads","CpuMs","ElapsedMs","ColdElapsedMs","ColdPhysicalReads"
+"ablation-no-title-05","05-prefix-search","count","1975","15","46","69","1974"
+"ablation-no-title-05","05-prefix-search","page","13","0","0","4","589"
