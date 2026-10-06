@@ -1,6 +1,6 @@
 # Request Tracker
 
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml) <!-- placeholder: replace <OWNER>/<REPO> after the first push -->
+[![CI](https://github.com/RuthGinsberger/request-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/RuthGinsberger/request-tracker/actions/workflows/ci.yml)
 
 A full stack home assignment: an enterprise-style request-management system (.NET 10 + SQL Server + Angular) that handles 100k+ requests with server-side paging, filtering, search, sorting, optimistic concurrency, audit history, bulk updates and a small cache.
 
