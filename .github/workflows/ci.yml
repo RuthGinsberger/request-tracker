@@ -55,7 +55,7 @@ jobs:
         run: dotnet format backend/RequestTracker.slnx --verify-no-changes --no-restore
       - name: Test
         env:
-          INTEGRATIONTESTS_SQLSERVER: localhost,1433;User Id=sa;Password=Ci_Passw0rd_NotASecret1;TrustServerCertificate=True
+          INTEGRATIONTESTS_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Ci_Passw0rd_NotASecret1;TrustServerCertificate=True
         run: >-
           dotnet test backend/RequestTracker.slnx --no-build --configuration Release
           --logger "trx;LogFilePrefix=results" --results-directory test-results

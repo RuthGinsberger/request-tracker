@@ -501,3 +501,6 @@ Format: Context · Decision · Alternatives considered · Rationale · Trade-off
 
 ## D-084 Verification limits (Task 15)
 - **Decision:** `actionlint` 1.7.7 (Windows binary) passes on the workflow; `bash -n` passes on the script; build, format, 216 unit + 145 integration tests, lint, 62 frontend tests and the build pass locally. The Docker parts and the script's runtime behaviour are verifiable only in the first CI run.
+
+## D-085 First CI run: integration-test connection string (publish task)
+- **Decision:** The first GitHub Actions run failed in the backend job: `INTEGRATIONTESTS_SQLSERVER` was `localhost,1433;User Id=sa;...` with no `Server=` key. `SqlServerFixture` treats any value containing `=` as a full connection string, so `SqlConnectionStringBuilder` rejected it ("Keyword not supported: 'localhost,1433;user id'") and all 145 integration tests failed (unit tests passed). Fixed in `ci.yml` by writing `Server=localhost,1433;User Id=sa;...`. Tests and fixture are unchanged; nothing was weakened or skipped.
