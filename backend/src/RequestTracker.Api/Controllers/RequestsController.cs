@@ -18,6 +18,9 @@ public sealed class RequestsController(
     IRequestReadCache cache,
     ICurrentUser currentUser) : ControllerBase
 {
+    private const string ETagHeaderName = "If-Match";
+    private const string UserHeaderDescription = "Acting user, recorded in the audit history (1-100 characters). Missing or invalid: 400.";
+
     /// <summary>
     /// Lists requests with server-side filtering, prefix search, sorting and paging. All filters combine with AND;
     /// <c>status</c> and <c>priority</c> may be repeated (OR within the parameter).
@@ -58,6 +61,8 @@ public sealed class RequestsController(
     /// input 400, missing If-Match 428, malformed If-Match 400, unknown id 404, stale version 409, transition 400, then 200.
     /// </summary>
     [HttpPatch("{id}/status")]
+    [DocumentedHeader(ETagHeaderName, "Strong ETag of the version last read, exactly as returned (e.g. \"AAAAAAAAB9U=\"). Missing: 428; malformed, * or weak: 400.")]
+    [DocumentedHeader(HeaderCurrentUser.HeaderName, UserHeaderDescription)]
     [ProducesResponseType<RequestDetailsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, ApiProblems.ContentType)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, ApiProblems.ContentType)]
@@ -71,12 +76,7 @@ public sealed class RequestsController(
         // 1. Input validation: id and body were checked by the validation filter; the user header is checked here.
         if (currentUser.UserName is not { } userName)
         {
-            var errors = new Dictionary<string, string[]>
-            {
-                [HeaderCurrentUser.HeaderName] =
-                    [$"The {HeaderCurrentUser.HeaderName} header is required (1-{UserNameRules.MaxLength} characters)."],
-            };
-            return new ProblemResult(ApiProblems.Validation(HttpContext, errors));
+            return MissingUserName();
         }
 
         // 2-3. Optimistic concurrency is mandatory: a missing header is 428, a malformed one 400.
@@ -116,18 +116,14 @@ public sealed class RequestsController(
     /// nothing is processed. If the client disconnects mid-call, items already saved stay saved.
     /// </summary>
     [HttpPost("bulk-status")]
+    [DocumentedHeader(HeaderCurrentUser.HeaderName, UserHeaderDescription)]
     [ProducesResponseType<BulkStatusResultDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, ApiProblems.ContentType)]
     public async Task<IActionResult> BulkChangeStatus([FromBody] BulkStatusBody body, CancellationToken cancellationToken)
     {
         if (currentUser.UserName is not { } userName)
         {
-            var errors = new Dictionary<string, string[]>
-            {
-                [HeaderCurrentUser.HeaderName] =
-                    [$"The {HeaderCurrentUser.HeaderName} header is required (1-{UserNameRules.MaxLength} characters)."],
-            };
-            return new ProblemResult(ApiProblems.Validation(HttpContext, errors));
+            return MissingUserName();
         }
 
         // Validated by the filter, so these parses cannot fail.
@@ -153,4 +149,11 @@ public sealed class RequestsController(
             _ => new ProblemResult(ApiProblems.NotFound(HttpContext, $"Request {query.Id} does not exist.")),
         };
     }
+
+    private ProblemResult MissingUserName() =>
+        new(ApiProblems.Validation(HttpContext, new Dictionary<string, string[]>
+        {
+            [HeaderCurrentUser.HeaderName] =
+                [$"The {HeaderCurrentUser.HeaderName} header is required (1-{UserNameRules.MaxLength} characters)."],
+        }));
 }

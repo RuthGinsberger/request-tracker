@@ -1,4 +1,4 @@
-# PLAN
+﻿# PLAN
 
 Status values: Todo · In progress · Done. Update at the end of every task.
 
@@ -19,6 +19,6 @@ Status values: Todo · In progress · Done. Update at the end of every task.
 | 13 | Performance analysis & index tuning | R14, R32–R36 | 9, 4 | No | Done | `perf/` scripts + `docs/PERFORMANCE.md` (17 scenarios on 100k rows, actual plans in `docs/performance/`); migrations `CoveringCreatedAtIndex` (page 1 182 → 6 reads, deep page 245,183 → 1,582) and `SortColumnIndexes` (sort by updatedAt/priority/status 2,010 → ~185 reads); decisions D-071–D-076 |
 | 14 | Run readiness: Docker Compose for evaluators, verified in CI | R58, R67 | 12, 13 | No | Done | Dockerfiles (backend: `api` + `seeder` targets; frontend: nginx), full Compose, `.env.example`, `.gitattributes`, `docs/COMPOSE_SMOKE_CHECKLIST.md`; mirrored publish/build, 361 backend + 62 frontend tests and lint pass locally; decisions D-077–D-080 | 
 | 15 | CI pipeline incl. SQL Server tests + Compose smoke test | R67, R69 | 14 | No | Done | `.github/workflows/ci.yml` (backend on a SQL Server 2022 service container, frontend, compose-smoke) + `ci/compose-smoke.sh`; actionlint clean, all non-Docker commands pass locally; **push to GitHub and check the Actions tab: the compose-smoke job is the proof that the Docker setup works**; decisions D-081–D-084 | 
-| 16 | Frontend tests | R25, R26, R28 | 12 | Yes | Todo | |
-| 17 | Documentation | R14, R23, R41, R58–R66, R70 | 14 | No | Todo | |
-| 18 | Final evaluator review | All | 1–17 | No | Todo | |
+| 16 | Frontend tests | R25, R26, R28 | 12 | Yes | Done | `requests-http-flows.spec.ts`: 7 HttpTestingController tests (debounce, cancellation, distinct, filter reset, error/retry, 409, 200); 69 frontend tests total; decision D-086 |
+| 17 | Documentation | R14, R23, R41, R58–R66, R70 | 14 | No | Done | `README.md` (17 sections incl. R0–R70 traceability and AI-usage placeholders), `docs/WORK_PLAN.md` "Actual status" column, `docs/ARCHITECTURE.md` section 14 (deviations); every README command run locally except Docker (verified by the CI compose-smoke job); 216 unit + 145 integration + 69 frontend tests, lint and format pass; decision D-087 |
+| 18 | Final evaluator review | All | 1–17 | No | Done | `docs/REVIEW.md` (R0–R70 audit, findings fixed, residual risks, submission checklist); clean-state LocalDB run, CI verified green on the pushed commit; OpenAPI now documents `If-Match` and `X-User-Name`; 362 backend + 69 frontend tests, lint, format pass; decisions D-088–D-091 |

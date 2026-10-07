@@ -27,7 +27,10 @@ import { SummaryStore } from './summary.store';
   providers: [RequestsListStore, SummaryStore, StatusUpdateService],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>Requests</h1>
+    <header class="page-header">
+      <h1>Requests</h1>
+      <p class="page-subtitle">Track, filter and update every request in one place.</p>
+    </header>
 
     <app-summary [view]="summaryStore.view()" (retry)="summaryStore.load()" />
 
@@ -86,13 +89,30 @@ import { SummaryStore } from './summary.store';
     }
   `,
   styles: `
+    .page-header {
+      margin-bottom: 1.5rem;
+    }
+    .page-subtitle {
+      margin: 0;
+      color: var(--rt-muted);
+      font-size: 1rem;
+    }
     .progress {
       height: 4px;
-      margin: 0.5rem 0;
+      margin: 0.75rem 0;
     }
     .message {
-      padding: 2rem 1rem;
+      padding: 3rem 1rem;
+      margin-top: 0.5rem;
       text-align: center;
+      color: var(--rt-muted);
+      background: var(--rt-surface);
+      border: 1px dashed #cfd3ea;
+      border-radius: var(--rt-radius);
+    }
+    .message p {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
     }
   `,
 })

@@ -3,6 +3,50 @@
   top: 0;
   z-index: 10;
   gap: 1rem;
+  height: 4.25rem;
+  padding: 0 1.5rem;
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: saturate(180%) blur(14px);
+  color: var(--rt-ink);
+  border-bottom: 1px solid var(--rt-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.7rem;
+  background: linear-gradient(135deg, var(--rt-brand-1), var(--rt-brand-2));
+  box-shadow: 0 6px 16px rgb(2 132 199 / 35%);
+
+  // A simple "check" glyph drawn in CSS.
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0.78rem;
+    top: 0.55rem;
+    width: 0.4rem;
+    height: 0.8rem;
+    border: solid #fff;
+    border-width: 0 0.18rem 0.18rem 0;
+    transform: rotate(45deg);
+  }
+}
+
+.app-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--rt-brand-1), var(--rt-brand-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .spacer {
@@ -10,7 +54,16 @@
 }
 
 .app-content {
-  padding: 1rem;
-  max-width: 90rem;
+  padding: 2rem 1.5rem 3rem;
+  max-width: 92rem;
   margin: 0 auto;
+}
+
+@media (max-width: 600px) {
+  .app-toolbar {
+    padding: 0 1rem;
+  }
+  .app-content {
+    padding: 1.25rem 1rem 2rem;
+  }
 }

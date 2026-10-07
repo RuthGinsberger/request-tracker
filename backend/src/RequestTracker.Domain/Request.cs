@@ -70,7 +70,7 @@ public class Request
     /// <summary>
     /// Moves the request to <paramref name="newStatus"/> if <see cref="StatusTransitionPolicy"/> allows it, setting
     /// Status and UpdatedAt and producing the audit entry. A disallowed transition leaves the state untouched.
-    /// Checking the client's expected version is the caller's job (Task 8).
+    /// Checking the client's expected version is the caller's job (RequestStatusChanger).
     /// </summary>
     public StatusChangeResult ChangeStatus(RequestStatus newStatus, string changedBy, DateTime utcNow)
     {

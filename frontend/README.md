@@ -1,5 +1,7 @@
 # Frontend
 
+How to run and test the whole solution (including this app) is described in the [root README](../README.md); this file is the Angular CLI scaffold text.
+
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.1.
 
 ## Development server

@@ -33,97 +33,99 @@ The assignment is broken down into **Features → User Stories → Tasks**. Ever
 
 ## 3. Tasks
 
-`Plan` = task number in `PLAN.md`. Estimates are hours. `NC` = non-coding task.
+`Plan` = task number in `PLAN.md`. Estimates are hours (the original planning estimates, unchanged). `NC` = non-coding task. `Actual status` records what exists at the time of Task 17: `Done` or `Not done`. Actual hours were not tracked, so only the status is compared with the plan.
+
+`*` The Dockerfiles, Compose file, workflow and smoke script are written and were checked statically and by mirroring their commands locally; Docker itself cannot run on the development machine, so only the CI `compose-smoke` job proves them (D-080, D-084). All tasks are done; T9.7 (the final evaluator review, Task 18) is documented in [REVIEW.md](REVIEW.md).
 
 ### F1 — Data & DB design
 
-| ID | Task (what is required) | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T1.1 | **NC** Analyze requirements and design the architecture: layers, API contract, concurrency, bulk, cache, edge cases | `docs/ARCHITECTURE.md`, design entries in `DECISIONS.md` | T1.3 | 6 | R1, R2, R4–R23, R37–R41, R61, R64 | 2 |
-| T1.2 | **NC** Break the requirements into features, stories and tasks with estimates, dependencies and traceability | `docs/WORK_PLAN.md` | T1.1 | 4 | R43–R48 | 2 |
-| T1.3 | **NC** Bootstrap repository: solution, projects and references, central build settings, Angular scaffold, LocalDB connection, Compose with DB, `.gitignore`/`.editorconfig`, README stub | Building solution and frontend, `CLAUDE.md`, `REQUIREMENTS.md`, `PLAN.md`, `DECISIONS.md`, stub README | – | 4 | R0, R4, R49, R57, R59, R68 | 1 |
-| T1.4 | **NC** Design the DB schema and initial index plan with a reason per index | Schema and index hypotheses (ARCHITECTURE §2, §4) | T1.1 | 3 | R2, R4, R34, R61 | 2 |
-| T1.5 | Implement domain entities, enums and `StatusTransitionPolicy`, with unit tests for every transition | Domain project, unit tests passing | T1.1 | 4 | R2, R16, R42b, R51 | 3 |
-| T1.6 | EF Core `DbContext`, entity configurations (tinyint enums, `rowversion`, CHECK constraints, indexes), initial migration | Migration applying cleanly to LocalDB; schema matches design | T1.4, T1.5 | 5 | R2, R4, R18, R20, R34 | 3 |
-| T1.7 | Seeder CLI: migrate, wipe, bulk-insert ≥ 100k realistic rows (skewed status/priority/org distribution, nullable assignee, spread dates), re-runnable on demand | `RequestTracker.Seeder`, documented command, ≥ 100,000 rows | T1.6 | 6 | R3 | 4 |
+| ID | Task (what is required) | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T1.1 | **NC** Analyze requirements and design the architecture: layers, API contract, concurrency, bulk, cache, edge cases | `docs/ARCHITECTURE.md`, design entries in `DECISIONS.md` | T1.3 | 6 | R1, R2, R4–R23, R37–R41, R61, R64 | 2 | Done |
+| T1.2 | **NC** Break the requirements into features, stories and tasks with estimates, dependencies and traceability | `docs/WORK_PLAN.md` | T1.1 | 4 | R43–R48 | 2 | Done |
+| T1.3 | **NC** Bootstrap repository: solution, projects and references, central build settings, Angular scaffold, LocalDB connection, Compose with DB, `.gitignore`/`.editorconfig`, README stub | Building solution and frontend, `CLAUDE.md`, `REQUIREMENTS.md`, `PLAN.md`, `DECISIONS.md`, stub README | – | 4 | R0, R4, R49, R57, R59, R68 | 1 | Done |
+| T1.4 | **NC** Design the DB schema and initial index plan with a reason per index | Schema and index hypotheses (ARCHITECTURE §2, §4) | T1.1 | 3 | R2, R4, R34, R61 | 2 | Done |
+| T1.5 | Implement domain entities, enums and `StatusTransitionPolicy`, with unit tests for every transition | Domain project, unit tests passing | T1.1 | 4 | R2, R16, R42b, R51 | 3 | Done |
+| T1.6 | EF Core `DbContext`, entity configurations (tinyint enums, `rowversion`, CHECK constraints, indexes), initial migration | Migration applying cleanly to LocalDB; schema matches design | T1.4, T1.5 | 5 | R2, R4, R18, R20, R34 | 3 | Done |
+| T1.7 | Seeder CLI: migrate, wipe, bulk-insert ≥ 100k realistic rows (skewed status/priority/org distribution, nullable assignee, spread dates), re-runnable on demand | `RequestTracker.Seeder`, documented command, ≥ 100,000 rows | T1.6 | 6 | R3 | 4 | Done |
 
 ### F2 — Query API
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T2.1 | API foundation: DI composition and lifetimes, `ProblemDetails` exception handling, header → `ICurrentUser`, logging conventions, OpenAPI, `/health` with DB check, `TimeProvider` | Running API skeleton with consistent errors and validation wiring | T1.6 | 6 | R12, R13, R49–R56 | 5 |
-| T2.2 | **NC + code** Define the test strategy and build the integration-test harness (`WebApplicationFactory`, unique LocalDB/SQL Server database per run, migrations, cleanup, data builders) | Test strategy section; working harness with one smoke test | T2.1 | 4 | R42, R42d | 5 |
-| T2.3 | `GET /api/requests/{id}` with projection mapping, `ETag`, 404 | Endpoint + DTO + mapping class + integration test | T2.1 | 3 | R13, R15, R51 | 5 |
-| T2.4 | List query model and FluentValidation rules (paging cap, date order, search length, enum values, sort fields) | Query model, validator, unit tests | T2.3 | 4 | R5–R7, R11, R55 | 6 |
-| T2.5 | List implementation: composed `IQueryable` with filters, escaped prefix search, sort with tiebreaker, `COUNT` + `OFFSET/FETCH`, `AsNoTracking` + `Select` | `GET /api/requests` per contract | T2.4 | 6 | R5–R9, R12, R13, R24, R36 | 6 |
-| T2.6 | List tests: happy path, combined filters, search escaping, sorting, past-end page, invalid input | Integration + unit tests passing | T2.5, T2.2 | 4 | R42a, R42b, R42d | 6 |
-| T2.7 | Aggregations: counts by status and by priority (global, all members including zero) | `GET /api/requests/summary` (uncached core query) + test | T2.5 | 3 | R10, R13 | 7 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T2.1 | API foundation: DI composition and lifetimes, `ProblemDetails` exception handling, header → `ICurrentUser`, logging conventions, OpenAPI, `/health` with DB check, `TimeProvider` | Running API skeleton with consistent errors and validation wiring | T1.6 | 6 | R12, R13, R49–R56 | 5 | Done |
+| T2.2 | **NC + code** Define the test strategy and build the integration-test harness (`WebApplicationFactory`, unique LocalDB/SQL Server database per run, migrations, cleanup, data builders) | Test strategy section; working harness with one smoke test | T2.1 | 4 | R42, R42d | 5 | Done |
+| T2.3 | `GET /api/requests/{id}` with projection mapping, `ETag`, 404 | Endpoint + DTO + mapping class + integration test | T2.1 | 3 | R13, R15, R51 | 5 | Done |
+| T2.4 | List query model and FluentValidation rules (paging cap, date order, search length, enum values, sort fields) | Query model, validator, unit tests | T2.3 | 4 | R5–R7, R11, R55 | 6 | Done |
+| T2.5 | List implementation: composed `IQueryable` with filters, escaped prefix search, sort with tiebreaker, `COUNT` + `OFFSET/FETCH`, `AsNoTracking` + `Select` | `GET /api/requests` per contract | T2.4 | 6 | R5–R9, R12, R13, R24, R36 | 6 | Done |
+| T2.6 | List tests: happy path, combined filters, search escaping, sorting, past-end page, invalid input | Integration + unit tests passing | T2.5, T2.2 | 4 | R42a, R42b, R42d | 6 | Done |
+| T2.7 | Aggregations: counts by status and by priority (global, all members including zero) | `GET /api/requests/summary` (uncached core query) + test | T2.5 | 3 | R10, R13 | 7 | Done |
 
 ### F3 — Status update & concurrency
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T3.1 | `RequestStatusService`: load, version check, policy check, set original `RowVersion`, update `UpdatedAt`, handle `DbUpdateConcurrencyException`, explicit result types | Application service with unit tests on logic paths | T1.5, T2.3 | 5 | R15–R19 | 8 |
-| T3.2 | `PATCH /api/requests/{id}/status` with `If-Match` parsing, `X-User-Name`, ordered checks, 428/400/404/409, new `ETag` | Endpoint per contract | T3.1 | 4 | R13, R15–R19, R55 | 8 |
-| T3.3 | Concurrency and validation tests, including N parallel updates (exactly one winner), stale/malformed/missing version, same status, Completed | Integration tests passing | T3.2, T2.2 | 4 | R17, R19, R42b, R42c, R42d | 8 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T3.1 | `RequestStatusService`: load, version check, policy check, set original `RowVersion`, update `UpdatedAt`, handle `DbUpdateConcurrencyException`, explicit result types | Application service with unit tests on logic paths | T1.5, T2.3 | 5 | R15–R19 | 8 | Done |
+| T3.2 | `PATCH /api/requests/{id}/status` with `If-Match` parsing, `X-User-Name`, ordered checks, 428/400/404/409, new `ETag` | Endpoint per contract | T3.1 | 4 | R13, R15–R19, R55 | 8 | Done |
+| T3.3 | Concurrency and validation tests, including N parallel updates (exactly one winner), stale/malformed/missing version, same status, Completed | Integration tests passing | T3.2, T2.2 | 4 | R17, R19, R42b, R42c, R42d | 8 | Done |
 
 ### F4 — Audit & history
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T4.1 | Write the audit row in the same `SaveChanges` (one transaction) as the status change | History row on every successful change | T3.1 | 2 | R20 | 8 |
-| T4.2 | `GET /api/requests/{id}/history` ordered by `ChangedAt` desc, `Id` desc; 404 | Endpoint + DTO + mapping | T4.1 | 3 | R15, R21 | 8 |
-| T4.3 | Audit tests: one row per change, none on failures, order, empty history, 404 | Integration tests passing | T4.2 | 2 | R20, R21, R42d | 8 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T4.1 | Write the audit row in the same `SaveChanges` (one transaction) as the status change | History row on every successful change | T3.1 | 2 | R20 | 8 | Done |
+| T4.2 | `GET /api/requests/{id}/history` ordered by `ChangedAt` desc, `Id` desc; 404 | Endpoint + DTO + mapping | T4.1 | 3 | R15, R21 | 8 | Done |
+| T4.3 | Audit tests: one row per change, none on failures, order, empty history, 404 | Integration tests passing | T4.2 | 2 | R20, R21, R42d | 8 | Done |
 
 ### F5 — Bulk update
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T5.1 | Bulk service reusing the single-update component: one load query, classification, per-item save, conflict detach-and-continue, summary | Bulk logic with unit tests | T3.1, T4.1 | 6 | R22, R23 | 9 |
-| T5.2 | `POST /api/requests/bulk-status` with whole-request validation (1–100 items, no duplicate ids, version format) | Endpoint per contract | T5.1 | 3 | R22, R55 | 9 |
-| T5.3 | Bulk tests: all updated, mixed outcomes (missing/stale/invalid), duplicates, >100, empty | Integration tests passing | T5.2 | 4 | R22, R23, R42d | 9 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T5.1 | Bulk service reusing the single-update component: one load query, classification, per-item save, conflict detach-and-continue, summary | Bulk logic with unit tests | T3.1, T4.1 | 6 | R22, R23 | 9 | Done |
+| T5.2 | `POST /api/requests/bulk-status` with whole-request validation (1–100 items, no duplicate ids, version format) | Endpoint per contract | T5.1 | 3 | R22, R55 | 9 | Done |
+| T5.3 | Bulk tests: all updated, mixed outcomes (missing/stale/invalid), duplicates, >100, empty | Integration tests passing | T5.2 | 4 | R22, R23, R42d | 9 | Done |
 
 ### F6 — Cache
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T6.1 | `IAppCache` abstraction + `HybridCache` implementation; cache summary (60 s) and lookups (10 min); `GET /api/lookups` | Cached endpoints; TTLs configurable | T2.7 | 4 | R10, R37, R38, R40 | 7 |
-| T6.2 | Invalidate the summary after a committed update (single and bulk, once per bulk call) | Invalidation wired into the shared update component | T6.1, T3.2 | 1.5 | R39 | 8, 9 |
-| T6.3 | Cache tests: second call served from cache, expiry, invalidation after update and bulk | Integration tests passing | T6.2, T5.2 | 2 | R37–R39 | 8, 9 |
-| T6.4 | **NC** Analyze and document multi-instance behaviour and the Redis + pub/sub option | Section in docs | T6.1 | 1.5 | R41 | 7 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T6.1 | `IAppCache` abstraction + `HybridCache` implementation; cache summary (60 s) and lookups (10 min); `GET /api/lookups` | Cached endpoints; TTLs configurable | T2.7 | 4 | R10, R37, R38, R40 | 7 | Done |
+| T6.2 | Invalidate the summary after a committed update (single and bulk, once per bulk call) | Invalidation wired into the shared update component | T6.1, T3.2 | 1.5 | R39 | 8, 9 | Done |
+| T6.3 | Cache tests: second call served from cache, expiry, invalidation after update and bulk | Integration tests passing | T6.2, T5.2 | 2 | R37–R39 | 8, 9 | Done |
+| T6.4 | **NC** Analyze and document multi-instance behaviour and the Redis + pub/sub option | Section in docs | T6.1 | 1.5 | R41 | 7 | Done |
 
 ### F7 — Angular client
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T7.1 | Frontend foundation: routing, Material theme, `core/` (typed models, API service, user-name interceptor, current-user service), proxy | App shell calling the API | T2.5 | 6 | R31, R49, R50 | 10 |
-| T7.2 | Filters and search with the RxJS pipeline (debounce 300 ms, distinct, `switchMap`, error-safe), URL query-param sync | Filter bar, store, pipeline | T7.1 | 8 | R24–R27, R31 | 11 |
-| T7.3 | Results table: server-side sort and paging, Loading / Empty / Error states | Table component | T7.2 | 5 | R24, R27, R31 | 11 |
-| T7.4 | Summary panel (counts by status and priority) | Summary component | T7.3, T6.1 | 3 | R29 | 12 |
-| T7.5 | Status change action sending `If-Match`, 409 flow (message, refresh row), transition errors; user picker | Status-change component | T7.3, T3.2 | 6 | R28, R31 | 12 |
-| T7.6 | Change-history dialog with its own states | History dialog | T7.5, T4.2 | 3 | R27, R30 | 12 |
-| T7.7 | Optional: Vitest tests for the search pipeline (debounce, cancellation, error recovery) and the 409 flow | Passing frontend tests | T7.6 | 5 | R25, R26, R28 | 16 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T7.1 | Frontend foundation: routing, Material theme, `core/` (typed models, API service, user-name interceptor, current-user service), proxy | App shell calling the API | T2.5 | 6 | R31, R49, R50 | 10 | Done |
+| T7.2 | Filters and search with the RxJS pipeline (debounce 300 ms, distinct, `switchMap`, error-safe), URL query-param sync | Filter bar, store, pipeline | T7.1 | 8 | R24–R27, R31 | 11 | Done |
+| T7.3 | Results table: server-side sort and paging, Loading / Empty / Error states | Table component | T7.2 | 5 | R24, R27, R31 | 11 | Done |
+| T7.4 | Summary panel (counts by status and priority) | Summary component | T7.3, T6.1 | 3 | R29 | 12 | Done |
+| T7.5 | Status change action sending `If-Match`, 409 flow (message, refresh row), transition errors; user picker | Status-change component | T7.3, T3.2 | 6 | R28, R31 | 12 | Done |
+| T7.6 | Change-history dialog with its own states | History dialog | T7.5, T4.2 | 3 | R27, R30 | 12 | Done |
+| T7.7 | Optional: Vitest tests for the search pipeline (debounce, cancellation, error recovery) and the 409 flow | Passing frontend tests | T7.6 | 5 | R25, R26, R28 | 16 | Done |
 
 ### F8 — Performance
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T8.1 | **NC + scripts** Measure at least two central operations (list with filters/search/sort; summary or status update) on 100k rows with repeatable scripts | `perf/` scripts and timings in `docs/PERFORMANCE.md` | T1.7, T5.3 | 5 | R32 | 13 |
-| T8.2 | **NC** Capture actual execution plans / `STATISTICS IO` for the main queries | Plans and I/O metrics in `docs/PERFORMANCE.md` | T8.1 | 3 | R33 | 13 |
-| T8.3 | **NC + migration** Validate each index hypothesis, drop or add indexes as evidence demands, record reason per index | Final index list with reasons, migration if changed | T8.2 | 4 | R14, R34, R36 | 13 |
-| T8.4 | **NC** Identify a bottleneck (e.g. deep `OFFSET`, `COUNT`, infix search) and propose an improvement (keyset paging, full-text) | Section in `docs/PERFORMANCE.md` | T8.3 | 2 | R35 | 13 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T8.1 | **NC + scripts** Measure at least two central operations (list with filters/search/sort; summary or status update) on 100k rows with repeatable scripts | `perf/` scripts and timings in `docs/PERFORMANCE.md` | T1.7, T5.3 | 5 | R32 | 13 | Done |
+| T8.2 | **NC** Capture actual execution plans / `STATISTICS IO` for the main queries | Plans and I/O metrics in `docs/PERFORMANCE.md` | T8.1 | 3 | R33 | 13 | Done |
+| T8.3 | **NC + migration** Validate each index hypothesis, drop or add indexes as evidence demands, record reason per index | Final index list with reasons, migration if changed | T8.2 | 4 | R14, R34, R36 | 13 | Done |
+| T8.4 | **NC** Identify a bottleneck (e.g. deep `OFFSET`, `COUNT`, infix search) and propose an improvement (keyset paging, full-text) | Section in `docs/PERFORMANCE.md` | T8.3 | 2 | R35 | 13 | Done |
 
 ### F9 — Quality, docs & run readiness
 
-| ID | Task | Expected output | Depends on | Est. | Requirements | Plan |
-|---|---|---|---|---|---|---|
-| T9.1 | **NC + config** Run readiness: Dockerfiles for seeder, API and UI (nginx), full Compose (db → seeder → api → ui) | `docker-compose.yml`, Dockerfiles, `.env.example` | T7.6, T8.3 | 5 | R58, R67 | 14 |
-| T9.2 | **NC + config** CI pipeline: build, lint, format check, backend tests against SQL Server service container, frontend build/lint/tests | `.github/workflows/ci.yml` green | T9.1 | 5 | R67, R69 | 15 |
-| T9.3 | **NC + config** Compose smoke test in CI (stack up, `/health`, list call, status update) | CI job green | T9.2 | 3 | R67 | 15 |
-| T9.4 | **NC** README: how to run (local and Compose), technologies and versions, solution structure | `README.md` | T9.3 | 3 | R58–R60, R69 | 17 |
-| T9.5 | **NC** Technical documentation: DB choice and indexes, concurrency and bulk, cache and invalidation, two significant decisions with alternatives, one limitation and one improvement | Docs sections, links to `ARCHITECTURE.md`/`PERFORMANCE.md` | T8.4, T9.1 | 5 | R14, R23, R40, R41, R61–R65 | 17 |
-| T9.6 | **NC** AI usage section: where AI was used, what was verified or changed manually (candidate completes marked placeholders) | README/docs section | T9.5 | 1.5 | R66, R70 | 17 |
-| T9.7 | **NC** Final evaluator review: walk the traceability matrix, run everything from a clean clone, fix gaps | Checked matrix, clean-clone run, repo ready to submit (no ZIPs) | T9.1–T9.6, all | 4 | All (R0, R57, R67–R69) | 18 |
+| ID | Task | Expected output | Depends on | Est. | Requirements | Plan | Actual status |
+|---|---|---|---|---|---|---|---|
+| T9.1 | **NC + config** Run readiness: Dockerfiles for seeder, API and UI (nginx), full Compose (db → seeder → api → ui) | `docker-compose.yml`, Dockerfiles, `.env.example` | T7.6, T8.3 | 5 | R58, R67 | 14 | Done * |
+| T9.2 | **NC + config** CI pipeline: build, lint, format check, backend tests against SQL Server service container, frontend build/lint/tests | `.github/workflows/ci.yml` green | T9.1 | 5 | R67, R69 | 15 | Done * |
+| T9.3 | **NC + config** Compose smoke test in CI (stack up, `/health`, list call, status update) | CI job green | T9.2 | 3 | R67 | 15 | Done * |
+| T9.4 | **NC** README: how to run (local and Compose), technologies and versions, solution structure | `README.md` | T9.3 | 3 | R58–R60, R69 | 17 | Done |
+| T9.5 | **NC** Technical documentation: DB choice and indexes, concurrency and bulk, cache and invalidation, two significant decisions with alternatives, one limitation and one improvement | Docs sections, links to `ARCHITECTURE.md`/`PERFORMANCE.md` | T8.4, T9.1 | 5 | R14, R23, R40, R41, R61–R65 | 17 | Done |
+| T9.6 | **NC** AI usage section: where AI was used, what was verified or changed manually (candidate completes marked placeholders) | README/docs section | T9.5 | 1.5 | R66, R70 | 17 | Done |
+| T9.7 | **NC** Final evaluator review: walk the traceability matrix, run everything from a clean clone, fix gaps | Checked matrix, clean-clone run, repo ready to submit (no ZIPs) | T9.1–T9.6, all | 4 | All (R0, R57, R67–R69) | 18 | Done |
 
 ## 4. Effort summary
 

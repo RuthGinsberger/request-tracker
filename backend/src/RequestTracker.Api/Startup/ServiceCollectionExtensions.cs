@@ -32,7 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICurrentUser, HeaderCurrentUser>();
         services.TryAddSingleton(TimeProvider.System);
 
-        services.AddOpenApi();
+        services.AddOpenApi(options => options.AddOperationTransformer<DocumentedHeaderTransformer>());
         return services;
     }
 }

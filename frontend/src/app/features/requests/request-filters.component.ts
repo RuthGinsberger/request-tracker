@@ -105,6 +105,12 @@ export interface DateRangeChange {
       flex-wrap: wrap;
       gap: 0.75rem;
       align-items: center;
+      background: var(--rt-surface);
+      border: 1px solid var(--rt-border);
+      border-radius: var(--rt-radius);
+      box-shadow: var(--rt-shadow-sm);
+      padding: 1.25rem 1.25rem 1rem;
+      margin-bottom: 0.5rem;
     }
     .search {
       flex: 1 1 18rem;

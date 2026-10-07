@@ -53,7 +53,8 @@ export interface HistoryDialogData {
   styles: `
     .subtitle {
       margin-top: 0;
-      opacity: 0.7;
+      color: var(--rt-muted);
+      font-weight: 500;
     }
     ul {
       list-style: none;
@@ -64,14 +65,21 @@ export interface HistoryDialogData {
       display: flex;
       flex-wrap: wrap;
       gap: 0.25rem 1rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+      padding: 0.75rem 0.5rem;
+      border-bottom: 1px solid var(--rt-border);
+    }
+    li:last-child {
+      border-bottom: 0;
     }
     time {
       min-width: 10rem;
+      color: var(--rt-muted);
+    }
+    li span:nth-of-type(1) {
+      font-weight: 600;
     }
     .by {
-      opacity: 0.7;
+      color: var(--rt-muted);
     }
   `,
 })

@@ -2,6 +2,8 @@
 
 Binding design for the Request Tracker. Every implementation task follows this document; deviations must be logged in `DECISIONS.md` first. Requirement IDs (R#) and clarification answers (A#) refer to `REQUIREMENTS.md`.
 
+> **Status after implementation (Task 17).** The design below was built; the places where the code intentionally differs are marked **Implemented as:** and collected in [section 14](#14-implementation-notes-intentional-deviations-from-the-original-design).
+
 ## 1. Overview and component diagram
 
 ```mermaid
@@ -47,7 +49,7 @@ flowchart LR
 
 ### Enums: tinyint in the DB, strings in JSON
 
-- **DB:** `tinyint` is 1 byte, compact in indexes, sorts numerically, and a value outside the enum is rejected by a `CHECK` constraint. EF maps the enum with `HasConversion<byte>()`.
+- **DB:** `tinyint` is 1 byte, compact in indexes, sorts numerically, and a value outside the enum is rejected by a `CHECK` constraint. **Implemented as:** the enums are declared `enum : byte`, so EF maps them to `tinyint` natively (explicit `HasColumnType("tinyint")` plus CHECK constraints) without `HasConversion<byte>()` (D-026).
 - **JSON:** enums are serialized as strings (`"InProgress"`) via `JsonStringEnumConverter` so the contract is readable, stable if the numeric values change, and self-documenting in OpenAPI. Unknown strings are rejected with 400, never coerced.
 - Because Priority/Status numeric order is meaningful, sorting by them is done in the DB on the numeric column.
 
@@ -202,7 +204,7 @@ All enum members are present, including zeros. Global (not filter-aware, A11). S
 ## 6. Concurrency design (R17–R19)
 
 - `RowVersion` is mapped with `IsRowVersion()`. SQL Server changes it automatically on every `UPDATE`, so application code cannot forget to bump it (R18).
-- Update flow in `RequestStatusService.ChangeStatusAsync(id, targetStatus, expectedVersion, userName, ct)`:
+- Update flow. **Implemented as:** `RequestStatusService.ChangeStatusAsync(id, target, expectedVersion, userName, ct)` loads the tracked entity (step 1) and hands it to `RequestStatusChanger.ApplyAsync`, which performs steps 2–6 and is shared with the bulk update (D-051). The cache invalidation is called by `RequestStatusService` after a successful commit. Steps:
   1. Load the entity **tracked** by id (`FirstOrDefaultAsync`). Null → `NotFound`.
   2. Fast pre-check: if `expectedVersion` ≠ current `RowVersion` → `Conflict(currentStatus, currentVersion)` (no write attempted).
   3. `StatusTransitionPolicy` check → `InvalidTransition`.
@@ -216,7 +218,7 @@ All enum members are present, including zeros. Global (not filter-aware, A11). S
 
 ## 7. Bulk design: Partial Success (R22, R23)
 
-Flow in `RequestStatusService.BulkChangeStatusAsync(targetStatus, items, userName, ct)`:
+Flow in `BulkStatusService.ChangeStatusAsync(...)` (**implemented as** a separate service that reuses `RequestStatusChanger.ApplyAsync`, so classification, the transition rule and the `RowVersion` predicate exist once; D-055):
 
 1. Load all requested ids in **one** query (`Where(r => ids.Contains(r.Id))`, tracked) into a dictionary.
 2. Classify each item in request order, using the same private step as the single update (shared component, no duplicated rules): missing → `notFound`; version mismatch → `conflict`; policy rejects → `invalidTransition`; otherwise a candidate.
@@ -234,11 +236,11 @@ Trade-off (documented limitation): up to 100 small transactions per call (one ro
 
 | Item | Key (tag) | TTL | Invalidated by |
 |---|---|---|---|
-| Summary (counts by status/priority, total) | `summary:v1` (tag `summary`) | 60 s absolute (`Cache:SummaryTtlSeconds`) | Every successful single or bulk status update |
-| Lookups (organizations, assignees) | `lookups:v1` (tag `lookups`) | 10 min absolute (`Cache:LookupsTtlMinutes`) | TTL only |
+| Summary (counts by status/priority, total) | `requests:summary:v1` (tag `summary`) | 60 s absolute (`Cache:SummaryTtlSeconds`) | Every successful single or bulk status update |
+| Lookups (organizations, assignees) | `requests:lookups:v1` (tag `lookups`) | 10 min absolute (`Cache:LookupsTtlMinutes`) | TTL only |
 
 - **Why these:** the summary is a full-table aggregate over 100k+ rows (hot, expensive, same answer for every user), read on every page load and changed only by the comparatively rare status update. Lookups are two `DISTINCT` scans of large columns that nothing in the API can change. List queries are not cached: their key space (filters × sort × page) is huge and hit rate is low (R40).
-- **Implementation:** `HybridCache` (in-process L1, stampede-protected `GetOrCreateAsync`), wrapped by an `IAppCache` abstraction in Application with an Infrastructure implementation; singleton lifetime. The factory delegate runs the DB query with the caller's token.
+- **Implementation:** `HybridCache` (in-process L1, stampede-protected `GetOrCreateAsync`), wrapped by the `IRequestReadCache` abstraction in Application (`GetSummaryAsync`, `GetLookupsAsync`, `InvalidateSummaryAsync`) with the `RequestReadCache` implementation in Infrastructure. **Implemented as:** `HybridCache` is a singleton, but the wrapper is **scoped**, because the cache factories use the scoped DbContext through `RequestSummaryService` (D-044). The factory delegate runs the DB query with the caller's token.
 - **Invalidation:** `RemoveByTagAsync("summary")` is called only **after** `SaveChangesAsync` succeeds (never before, never on a failed or rolled-back update). Bulk invalidates once per call.
 - **Known race:** a read that started before a commit can finish after the invalidation and re-populate the cache with the pre-commit value. The stale window is bounded by the TTL (≤ 60 s) and is acceptable because the summary is advisory and shows `generatedAtUtc`. Strict consistency would need versioned keys or a write-through approach, which is over-engineering here.
 - **Multiple server instances:** each instance has its own L1. Invalidation only clears the instance that handled the write, so other instances serve a stale summary for up to the TTL. Options: (a) accept it, keeping the 60 s TTL as the bound (current choice); (b) register a distributed L2 (Redis) behind the same `HybridCache` so values are shared, and add a pub/sub backplane that broadcasts tag invalidations to clear every instance's L1. Neither is built (A17); the abstraction makes (b) a configuration and composition change.
@@ -249,7 +251,7 @@ Trade-off (documented limitation): up to 100 small transactions per call (one ro
 | Project | Contains | Must not |
 |---|---|---|
 | `Domain` | `Request`, `RequestStatusHistory`, `RequestStatus`, `RequestPriority`, `StatusTransitionPolicy`; no dependencies | reference EF Core or anything else |
-| `Application` | DTOs; query/command models (`RequestListQuery`, `ChangeStatusCommand`, `BulkChangeStatusCommand`); FluentValidation validators; mapping (`RequestMappings`: projection expressions `Expression<Func<Request, RequestListItemDto>>`, one per DTO); services (`RequestQueryService`, `RequestStatusService`, `SummaryService`, `LookupService`); abstractions (`IAppDbContext` exposing `DbSet`s + `SaveChangesAsync` + entry access, `IAppCache`, `ICurrentUser`); result types | reference Infrastructure/Api, or ASP.NET types |
+| `Application` | DTOs; query/body models (`RequestListQuery`, `GetRequestQuery`, `ChangeStatusBody`, `BulkStatusBody`); FluentValidation validators; mapping (`RequestMappings`: projection expressions `Expression<Func<Request, RequestListItemDto>>`, one per DTO; `SummaryMappings`); services (`RequestQueryService`, `RequestStatusService` (single update + history), `BulkStatusService`, `RequestStatusChanger` (the shared change step), `RequestSummaryService` (summary and lookups)); abstractions (`IAppDbContext` exposing `DbSet`s + `SaveChangesAsync` + entry access, `IRequestReadCache`, `ICurrentUser`); result types. **Implemented as** listed here: there is no `ChangeStatusCommand`, `SummaryService`, `LookupService` or `IAppCache` (D-044, D-051, D-055) | reference Infrastructure/Api, or ASP.NET types |
 | `Infrastructure` | `AppDbContext`, entity configurations, migrations, `HybridCache`-based `IAppCache`, DI extension `AddInfrastructure` | contain business rules |
 | `Api` | Controllers, `ProblemDetails` exception middleware/`IExceptionHandler`, header parsing (`If-Match`, `X-User-Name` → `ICurrentUser`), ETag helpers, DI composition, OpenAPI, health checks | contain query/update logic |
 
@@ -266,6 +268,8 @@ Global error handling: `IExceptionHandler` converts unexpected exceptions into `
 
 ## 10. Frontend architecture
 
+Planned layout (the design):
+
 ```
 frontend/src/app/
   core/        api/ (requests-api.service.ts), models/ (DTO interfaces mirroring the API),
@@ -278,7 +282,23 @@ frontend/src/app/
   shared/      small reusable pieces (loading/empty/error states, status chip)
 ```
 
-- Components present and handle interaction; `RequestsApiService` owns HTTP; `RequestsStore` owns state and the pipeline (R31). All components `OnPush`, standalone.
+**Implemented as** (the real layout; D-058–D-070):
+
+```
+frontend/src/app/
+  core/api/          requests-api.service.ts (the only HttpClient user; cold Observables), http-params.ts (query -> HttpParams)
+  core/models/       typed DTO interfaces, api-error.ts, enums.ts, status-transitions.ts (UX-only mirror of the transition table)
+  core/interceptors/ user-name.interceptor.ts (adds X-User-Name to mutating calls), error.interceptor.ts (HttpErrorResponse -> ApiError)
+  core/user/         current-user.service.ts (signal persisted to localStorage), user-picker.component.ts (toolbar)
+  features/requests/ requests-page.component.ts (container), request-filters.component.ts, requests-table.component.ts,
+                     summary.component.ts + summary.store.ts, history-dialog.component.ts + history.store.ts,
+                     requests-list.store.ts (+ .state.ts, .query-params.ts: debounce -> switchMap pipeline, URL state),
+                     status-update.service.ts (If-Match + 409 flow)
+```
+
+There is no `shared/` folder: the loading / empty / error states live in the components that need them (R57). The stores are plain `@Injectable()` classes provided by the page (no NgRx).
+
+- Components present and handle interaction; `RequestsApiService` owns HTTP; `RequestsListStore`, `SummaryStore`, `HistoryStore` and `StatusUpdateService` own state and the flows (R31). All components `OnPush`, standalone.
 - `CurrentUserService` holds the selected user name (a signal persisted to `localStorage`, chosen from `/api/lookups` assignees); `user-name.interceptor` adds `X-User-Name` to mutating calls.
 - **Search pipeline (R24–R26):**
 
@@ -293,8 +313,10 @@ query$.pipe(
 );
 ```
 
+  **Implemented as:** the query state lives in one private `BehaviorSubject` inside `RequestsListStore`; `search$ → debounce(300 ms, immediate when the box is emptied) → trim → distinctUntilChanged` commits the term into that state, and state changes plus Retry go through one `switchMap` with `catchError` and `startWith(loading)` inside it; any change to search, filters, sort or page size resets to page 1 (D-062, D-063). The sketch above is the idea, not the literal code.
+
   The UI shows Loading, Empty (loaded with zero items) and Error (with retry) states (R27).
-- **URL sync:** search, filters, sort, page and pageSize are read from the query string at start-up and written back with `router.navigate(..., { queryParamsHandling: 'merge', replaceUrl: true })`, so refresh and shared links reproduce the view.
+- **URL sync:** search, filters, sort, page and pageSize are read from the query string at start-up and written back with `router.navigate([], { queryParams, replaceUrl: true })` (defaults omitted), so refresh and shared links reproduce the view. **Implemented as:** the URL is parsed once at start and never read again (D-064).
 - **Summary (R29):** `summary-panel` loads `/api/requests/summary` on init and after a successful status change.
 - **Status update and 409 UX (R28):** the action offers only allowed target statuses (UI convenience; the server remains authoritative). It sends `PATCH` with `If-Match` = the row's `version`. On `200` the row is replaced and the summary refreshed. On `409` a snackbar/dialog says the request was changed by someone else and shows the current status from the ProblemDetails; the row is refreshed from the server (`currentStatus`/`currentVersion`, or a `GET /{id}`), and the user may retry deliberately. On `400 invalid-status-transition` the message is shown inline. Other errors show a generic error with `traceId`.
 - **History (R30):** a dialog fetches `/history` on open (own loading/empty/error states).
@@ -306,7 +328,9 @@ query$.pipe(
 |---|---|---|
 | Unit (xUnit, no DB) | `StatusTransitionPolicy` (every cell of §3), validators (page size cap, date order, search length, bulk size/duplicates/version format), `ETag`/version parsing, mapping, search-escape helper | R42b |
 | Integration (xUnit + `WebApplicationFactory`, real SQL Server) | List: filter + search + sort + paging happy path, page past end; invalid input → 400 ProblemDetails; GET by id 200/404; status update success updates `UpdatedAt`, `version` and writes exactly one history row; **concurrency: N parallel PATCH with the same version → exactly one 200 and N−1 409, one history row**; missing `If-Match` 428; same-status 400; bulk: mixed outcomes, duplicate ids, >100 items, partial success; cache: summary invalidated after update and after bulk | R42a, R42b, R42c, R42d |
-| Frontend (Vitest, optional Task 16) | RxJS search pipeline (debounce, distinct, switchMap cancellation, error survives), 409 flow | R25, R26, R28 |
+| Frontend (Vitest, Task 16, done) | RxJS search pipeline (debounce, distinct, switchMap cancellation, error survives), 409 flow. **Implemented as** 69 tests in 9 files; `requests-http-flows.spec.ts` drives the real stores and services through `HttpTestingController` (D-086) | R25, R26, R28 |
+
+**Implemented as:** 216 unit and 146 integration tests (362 backend) plus the 69 frontend tests, all run by CI (README section 4 maps them to R42a–R42d).
 
 - Integration tests read the SQL Server from `INTEGRATIONTESTS_SQLSERVER` (a connection string or a server name; default `(localdb)\MSSQLLocalDB`), and create a **unique database per run** (`RequestTracker_Tests_{guid}`), applying migrations at start and dropping the database at the end. Locally that is LocalDB; in CI a SQL Server service container. No Testcontainers (D-010).
 - Tests create their own small data sets, so they do not depend on the 100k seed.
@@ -355,3 +379,23 @@ flowchart LR
 | Cache invalidation racing a concurrent read | A stale value may be re-cached; bounded by the 60 s TTL (§8) |
 | History of an existing request with no changes | 200 with `[]` |
 | History of an unknown request | 404 |
+
+## 14. Implementation notes: intentional deviations from the original design
+
+Everything above was built as designed except the points below. Each is logged in `DECISIONS.md`, and is also marked **Implemented as:** in the section it affects.
+
+| Area | Design said | Built | Why | Decision |
+|---|---|---|---|---|
+| Enum mapping (§2) | `HasConversion<byte>()` | `enum : byte` mapped natively to `tinyint` + CHECK | Same schema, less configuration | D-026 |
+| Status update service (§6, §9) | One `RequestStatusService` does the whole update | `RequestStatusService` loads the entity, invalidates the cache after commit; `RequestStatusChanger.ApplyAsync` does version check, transition, `RowVersion` predicate and audit row | One implementation shared by the single and bulk updates | D-051, D-055 |
+| Bulk (§7) | `RequestStatusService.BulkChangeStatusAsync` | `BulkStatusService` reusing `RequestStatusChanger` | No duplicated rules | D-055 |
+| Cache abstraction (§8, §9) | `IAppCache`, singleton | `IRequestReadCache` (summary, lookups, invalidate), scoped wrapper over a singleton `HybridCache`; keys `requests:summary:v1` / `requests:lookups:v1` | The factories use the scoped DbContext | D-044 |
+| Application services (§9) | `SummaryService`, `LookupService`, `ChangeStatusCommand` | `RequestSummaryService` (both aggregates), `ChangeStatusBody`, `BulkStatusBody`, `GetRequestQuery` | Smaller surface | D-042, D-046, D-053 |
+| Stale version status (§5) | 409 (kept) | 409; `412` stays the documented alternative | Assignment says Conflict | D-017, D-050 |
+| Index plan (§4) | Six non-clustered indexes | Nine: `IX_Requests_CreatedAt` made covering; three single-column sort indexes added | Measured on 100k rows | D-073, D-074, D-075 |
+| Frontend layout (§10) | `shared/`, a `RequestsStore`, combineLatest pipeline | No `shared/`; `RequestsListStore` with a BehaviorSubject state and one `switchMap`; `core/user/` for the user picker; a `StatusUpdateService` | Simpler, no NgRx | D-058–D-070 |
+| Frontend tests (§11) | Optional Task 16 | Done: 69 tests | A24 | D-086 |
+| Run topology (§12) | Compose db → seeder → api → ui | As designed; nginx reverse proxy instead of CORS; `seeder --if-empty` makes re-runs idempotent; API runs in Production (OpenAPI UI off unless `API_ENVIRONMENT=Development`) | Same origin as `ng serve` + proxy | D-077–D-079 |
+| Verification (§12) | Compose verified in CI | Compose could not be run locally; proven only by the CI `compose-smoke` job | No Docker on the dev machine | D-080, D-084 |
+
+Not deviations but additions worth knowing: the Seeder waits for the SQL Server instance with exponential backoff (D-029); `/health` runs a DbContext check (D-036); a page past the end skips the page query entirely (D-041); `createdTo = 9999-12-31` applies no upper bound instead of overflowing (D-038).

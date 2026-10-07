@@ -63,11 +63,15 @@ export interface PageChange {
         </ng-container>
         <ng-container matColumnDef="status">
           <th mat-header-cell *matHeaderCellDef mat-sort-header="status">Status</th>
-          <td mat-cell *matCellDef="let row">{{ row.status }}</td>
+          <td mat-cell *matCellDef="let row">
+            <span class="chip" [class]="'chip status-' + row.status">{{ row.status }}</span>
+          </td>
         </ng-container>
         <ng-container matColumnDef="priority">
           <th mat-header-cell *matHeaderCellDef mat-sort-header="priority">Priority</th>
-          <td mat-cell *matCellDef="let row">{{ row.priority }}</td>
+          <td mat-cell *matCellDef="let row">
+            <span class="chip" [class]="'chip priority-' + row.priority">{{ row.priority }}</span>
+          </td>
         </ng-container>
         <ng-container matColumnDef="assignedTo">
           <th mat-header-cell *matHeaderCellDef>Assigned to</th>
@@ -85,19 +89,21 @@ export interface PageChange {
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let row">
-            @if (targetsOf(row).length > 0) {
-              <button
-                mat-stroked-button
-                type="button"
-                [matMenuTriggerFor]="statusMenu"
-                [matMenuTriggerData]="{ row: row }"
-                [disabled]="pendingIds().has(row.id)"
-                [attr.aria-label]="'Change status of request ' + row.id"
-              >
-                Change status
-              </button>
-            }
-            <button mat-button type="button" (click)="historyRequested.emit(row)">History</button>
+            <div class="actions">
+              @if (targetsOf(row).length > 0) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [matMenuTriggerFor]="statusMenu"
+                  [matMenuTriggerData]="{ row: row }"
+                  [disabled]="pendingIds().has(row.id)"
+                  [attr.aria-label]="'Change status of request ' + row.id"
+                >
+                  Change status
+                </button>
+              }
+              <button mat-button type="button" (click)="historyRequested.emit(row)">History</button>
+            </div>
           </td>
         </ng-container>
 
@@ -126,12 +132,95 @@ export interface PageChange {
     />
   `,
   styles: `
+    :host {
+      display: block;
+      background: var(--rt-surface);
+      border: 1px solid var(--rt-border);
+      border-radius: var(--rt-radius);
+      box-shadow: var(--rt-shadow-md);
+      overflow: hidden;
+    }
     .table-scroll {
       overflow-x: auto;
     }
     table {
       width: 100%;
     }
+    th.mat-mdc-header-cell {
+      background: #f8f9fe;
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--rt-muted);
+      border-bottom: 1px solid var(--rt-border);
+    }
+    td.mat-mdc-cell {
+      border-bottom: 1px solid #f0f1f8;
+      color: var(--rt-ink);
+    }
+    td.mat-column-id {
+      color: var(--rt-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    td.mat-column-title {
+      font-weight: 500;
+    }
+    td.mat-column-createdAt,
+    td.mat-column-updatedAt {
+      color: var(--rt-muted);
+      white-space: nowrap;
+    }
+    tr.mat-mdc-row {
+      transition: background 0.15s ease;
+    }
+    tr.mat-mdc-row:hover {
+      background: #eff8ff;
+    }
+    tr.mat-mdc-row:last-child td.mat-mdc-cell {
+      border-bottom: 0;
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 9rem auto;
+      align-items: center;
+      gap: 0.25rem;
+      white-space: nowrap;
+    }
+    .actions button[mat-stroked-button] {
+      width: 100%;
+    }
+    /* History stays in the same column when there is no Change status button. */
+    .actions > button:only-child {
+      grid-column: 2;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.15rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      line-height: 1.5;
+      white-space: nowrap;
+      background: #eef0f6;
+      color: #475066;
+    }
+    .chip::before {
+      content: '';
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-New { background: #e6efff; color: #1d4ed8; }
+    .status-InProgress { background: #fff1d6; color: #9a5b00; }
+    .status-Waiting { background: #f0e7ff; color: #6d28d9; }
+    .status-Completed { background: #dcf5e6; color: #15803d; }
+    .priority-Low { background: #eef0f6; color: #5b6480; }
+    .priority-Medium { background: #fff1d6; color: #9a5b00; }
+    .priority-High { background: #fde6e6; color: #c0262d; }
   `,
 })
 export class RequestsTableComponent {

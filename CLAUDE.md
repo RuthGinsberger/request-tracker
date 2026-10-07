@@ -54,4 +54,4 @@ Windows dev machine, PowerShell. The DB is LocalDB: `Server=(localdb)\MSSQLLocal
   - options: `--count <n>` (default 100000), `--seed <n>` (default 42), `--anchor yyyy-MM-dd` (default today UTC; pin it to reproduce data across days), `--if-empty` (Compose: no-op when data exists), `--help`
   - without `--reset`/`--if-empty` a non-empty table is refused (exit 1); usage errors exit 2; Ctrl+C rolls back (exit 130)
 - Compose (evaluators/CI only, never run locally): `docker compose up --build` → UI http://localhost:8080; the seeder owns migrations (D-077). The local dev path above (LocalDB + `dotnet run` + `ng serve`) is unchanged. Mirror the Dockerfile builds locally with `dotnet publish <proj> -c Release -o <dir> /p:UseAppHost=false` (from `backend/`) and `npx ng build --configuration production` (output `frontend/dist/frontend/browser`).
-- CI workflows: added in Task 15.
+- CI workflows: `.github/workflows/ci.yml` (backend on SQL Server, frontend, compose-smoke). Full documentation: `README.md`.

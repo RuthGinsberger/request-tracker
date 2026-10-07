@@ -29,6 +29,24 @@ public sealed class HealthAndOpenApiTests(SqlServerFixture fixture) : Integratio
         Assert.Contains("/api/requests/{id}", await document.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, ui.StatusCode);
     }
+
+    [Fact]
+    public async Task OpenApi_document_declares_the_headers_the_update_endpoints_require()
+    {
+        using var document = JsonDocument.Parse(await Client.GetStringAsync("/openapi/v1.json"));
+        var paths = document.RootElement.GetProperty("paths");
+
+        static string[] HeaderNames(JsonElement operation) =>
+            [.. operation.GetProperty("parameters").EnumerateArray()
+                .Where(p => p.GetProperty("in").GetString() == "header")
+                .Select(p => p.GetProperty("name").GetString()!)];
+
+        var patch = paths.GetProperty("/api/requests/{id}/status").GetProperty("patch");
+        var bulk = paths.GetProperty("/api/requests/bulk-status").GetProperty("post");
+
+        Assert.Equal(["If-Match", "X-User-Name"], HeaderNames(patch).Order().ToArray());
+        Assert.Equal(["X-User-Name"], HeaderNames(bulk));
+    }
 }
 
 /// <summary>Unreachable database: health turns unhealthy and API calls fail safely without leaking details.</summary>

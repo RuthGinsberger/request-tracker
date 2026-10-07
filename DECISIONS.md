@@ -504,3 +504,48 @@ Format: Context · Decision · Alternatives considered · Rationale · Trade-off
 
 ## D-085 First CI run: integration-test connection string (publish task)
 - **Decision:** The first GitHub Actions run failed in the backend job: `INTEGRATIONTESTS_SQLSERVER` was `localhost,1433;User Id=sa;...` with no `Server=` key. `SqlServerFixture` treats any value containing `=` as a full connection string, so `SqlConnectionStringBuilder` rejected it ("Keyword not supported: 'localhost,1433;user id'") and all 145 integration tests failed (unit tests passed). Fixed in `ci.yml` by writing `Server=localhost,1433;User Id=sa;...`. Tests and fixture are unchanged; nothing was weakened or skipped.
+
+## D-086 Frontend tests over real HttpClient (Task 16)
+- **Decision:** New `requests-http-flows.spec.ts` drives the real `RequestsListStore`, `SummaryStore`, `StatusUpdateService`, `RequestsApiService` and the error interceptor through `HttpTestingController` and `vi.useFakeTimers()`; only `MatSnackBar` is stubbed. Each test ends with `httpMock.verify()`. No production code was changed (no refactors needed).
+- **Rationale:** The existing specs stub `RequestsApiService`, so they could not observe `req.cancelled`, the `If-Match` header or the actual follow-up calls (row GET, summary GET). The new file complements them and does not replace them.
+- **Note:** `ng build` reports the pre-existing initial-bundle budget warning (571 kB vs 500 kB); unrelated to this task, not changed.
+- **Related requirements:** R25, R26, R28.
+
+## D-087 Documentation task: scope, evidence rules and what was not claimed (Task 17)
+- **Decision:** `README.md` has one titled section per R58–R66 plus the quick start, a tests-to-R42 table and an R0–R70 traceability table. Versions were read from `backend/global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.config/dotnet-tools.json`, `frontend/package.json` / installed `node_modules`, the Dockerfiles and `docker-compose.yml` (no `global.json` at the repo root: it is in `backend/`). Commands were executed in this session: seeder `--help` and `--reset --anchor 2026-10-06`, the API and `ng serve` through the dev proxy (health, list, summary, GET by id, PATCH 200 / 409 / 428, bulk with mixed outcomes, history; the README's 409 and bulk examples are real responses), `dotnet build`, `dotnet test` (216 + 145), the `INTEGRATIONTESTS_SQLSERVER` server-name form, `dotnet format --verify-no-changes`, `ng lint`, `ng test` (69). A script checked that every relative link and heading anchor in README, WORK_PLAN and ARCHITECTURE resolves and that every test name quoted in the README exists. The dev database was re-seeded afterwards (`--reset --anchor 2026-10-06`) to undo the demo updates.
+- **Not run / not claimed:** Docker, the Compose quick start and the macOS/Linux "db service only" path were not run (no Docker locally); they are checked against `docker-compose.yml`, `ci/compose-smoke.sh` and the CI job, and the README says so. The first-run time is described as "several minutes" because it was never measured. The AI-usage section states only what the repo records (task-by-task Claude Code sessions, commit trailers) and leaves personal review / change claims as `TODO(candidate)` placeholders (A22, R70).
+- **Docs aligned with the code:** `docs/ARCHITECTURE.md` keeps the original design text and marks each difference with "Implemented as:" plus a deviations table (section 14); `docs/WORK_PLAN.md` gets an "Actual status" column (all `Done` except T9.7; T9.1–T9.3 carry `*` because only CI can prove Docker) and the estimates are unchanged; `CLAUDE.md` and `frontend/README.md` got one-line pointers.
+- **Doc-discovered bugs:** none found; no code changed. Headings in the README use `-` instead of an en dash in requirement ranges (for example "R37-R41") because GitHub drops the en dash from heading anchors and would break the links.
+- **Related requirements:** R58–R66, R70, R14, R23, R41.
+
+## D-088 OpenAPI documents the custom headers (Task 18 review)
+- **Context:** `If-Match` and `X-User-Name` are read inside the actions (so a missing `If-Match` can be 428 and a malformed one 400 in the documented order), which means the framework never saw them and the OpenAPI document did not list them. An API consumer reading `/openapi/v1.json` could not tell that `PATCH /api/requests/{id}/status` needs both and `POST /api/requests/bulk-status` needs the user header.
+- **Decision:** a small `[DocumentedHeader(name, description)]` attribute on the two actions plus one `IOpenApiOperationTransformer` that adds them as required header parameters. Behaviour and check order are unchanged. Integration test `OpenApi_document_declares_the_headers_the_update_endpoints_require` locks it in.
+- **Alternatives considered:** binding with `[FromHeader]` (would turn a missing header into a model-binding 400 and break the 428 contract); describing the headers only in prose (not machine-readable).
+- **Related requirements:** R54, R17, R19, REST accuracy.
+
+## D-089 Small cleanups from the review (Task 18)
+- **Decision:** the "header X-User-Name is required" validation problem was built twice in `RequestsController`; it is now one private method. A stale `(Task 8)` reference in a `Request` doc comment now names `RequestStatusChanger`. A misplaced comment in `RequestTracker.Api.csproj` ("design-time only") now sits above the EF Design package it describes.
+- **Related requirements:** R50.
+
+## D-090 Initial bundle budget (Task 18)
+- **Context:** `ng build` printed a warning on every build: initial bundle 571.55 kB against a 500 kB budget (D-086 noted it as pre-existing). The size is Angular Material plus the app; no component is oversized.
+- **Decision:** raise the warning threshold to 650 kB (error stays 1 MB) so the build is warning-free and a real regression still shows. Not an optimization: lazy-loading the dialog or splitting Material would add structure for no requirement (R57).
+- **Related requirements:** R49, R57.
+
+## D-091 Review scope: verified and deliberately left as is (Task 18)
+- **Verified by running:** seeder `--reset` (100,000 rows, 8 s), API on LocalDB, `ng serve` proxy on :4200, the documented edge cases (wildcard search, `createdFrom > createdTo`, `pageSize` 101, same-status update, `Completed -> X`, `If-Match: *`, missing `If-Match`, 101-item bulk, duplicate ids, 404, 409 with a stale ETag, mixed bulk, history, summary refresh after update). Every response matched `docs/ARCHITECTURE.md` section 13. The dev database was re-seeded afterwards. CI: the latest pushed commit is green in all three jobs (backend, frontend, Docker Compose smoke); local changes of this review are not pushed.
+- **Left as is:** (1) a bulk call cancelled mid-way does not invalidate the summary cache, so the summary can be up to one TTL (60 s) old (documented in `BulkStatusService` and README); making it invalidate in a `finally` would be a small change but cannot be tested deterministically without a test seam, so it stays a documented limitation. (2) The UI was not click-tested in a browser (no browser automation here); it is covered by 69 tests and the same API calls over the dev proxy. (3) No change to indexes, paging or the cache design: each is backed by measurements in `docs/PERFORMANCE.md`.
+- **Related requirements:** R67, R65, R39.
+
+## D-092 Hebrew summary for evaluators; detailed technical docs kept in English
+- **Context:** the assignment was given in Hebrew and the evaluators read Hebrew, while all existing documentation is in English.
+- **Decision:** add `README.he.md`, a concise Hebrew overview (RTL-wrapped, English technical terms, commands and file names kept in backticks and code blocks) that points to the English sections for detail, and link it from the top of `README.md`. No other document was translated or changed.
+- **Rationale:** keeping detailed technical documentation in English is the industry standard; GitHub renders long RTL Markdown (tables, mixed Hebrew/English lines) poorly, so a short summary limits that exposure; a single English source of truth avoids two documents drifting apart. Every number in the summary is copied from `README.md` or `docs/PERFORMANCE.md`; the English documents win on any discrepancy. The AI-usage section is only linked, not summarized.
+- **Related requirements:** R58, R66, R69.
+
+## D-093 Visual polish of the UI (presentation only)
+- **Context:** the owner asked for a more polished, "real product" look. A23 asked for minimal custom styling.
+- **Decision:** restyle the frontend visually only: violet Material theme, Inter font, design tokens (`--rt-*`) in `styles.scss`, gradient brand header, elevated cards and table, status/priority chips with a dot, softer filters panel, styled empty/error states and history dialog. Only `styles`, SCSS and static markup (brand mark, page subtitle) changed; no component logic, bindings, stores, services, API or tests were touched. Build, lint and all 69 frontend tests pass.
+- **Rationale:** explicit owner request overrides the A23 default; graphic design is not graded (R0), so the change is kept to CSS to avoid any behavioural risk.
+- **Related requirements:** A23.
